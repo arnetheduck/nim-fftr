@@ -8,8 +8,8 @@ srcDir        = "src"
 installExt    = @["nim"]
 
 requires "nim >= 1.6.0"
+requires "unittest2"
 
-taskRequires "test", "unittest2"
 taskRequires "bench", "benchy", "fftw3"
 
 let nimc = getEnv("NIMC", "nim") # Which nim compiler to use

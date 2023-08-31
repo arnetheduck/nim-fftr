@@ -1,8 +1,10 @@
 # fftn
 
-The fastest Fourier transform in the Rhein computes the complex [discrete Fourier transform](https://en.wikipedia.org/wiki/Discrete_Fourier_transform) (DFT) of a signal and back again.
+The fastest Fourier transform in the Rhein computes the complex [discrete Fourier transform](https://en.wikipedia.org/wiki/Discrete_Fourier_transform) (DFT) of a signal and back again with `O(N log N)` performance as usual.
 
-Faster ones exist, but hey, it has decent speed, is less than 300loc and is written in pure Nim for minimal hassle. It's also likely the only one developed from a viewpoint overlooking the Rhein river.
+Faster ones exist, but hey, it has decent speed, is less than 300loc and is written in pure Nim for minimal hassle.
+
+It's also likely the only one developed from a viewpoint overlooking the Rhein river.
 
 ## Usage
 
@@ -18,16 +20,11 @@ Compute frequencies in a signal:
 import fftr, std/math
 
 let
-  signal = block:
-    var tmp: newSeq[Complex64](1024)
-    for i in 0..<tmp.len:
-      # Stuff the signal in the reals
-      tmp[i].re = sin(TAU * 0.1 * float64(i))
-    tmp
+  signal = (0..1023).mapIt(complex64(sin(TAU * 0.1 * float64(it))))
 
   # abs gets us back into real space
   # false for forward FFT, true for inverse (TODO flip it? separate names?)
-  frequencies = mapIt(fft(tmp, false), abs(it))
+  frequencies = fft(signal, false).mapIt(abs(it))
 ```
 
 For performance, it's important to compile the application with [LTO](https://en.wikipedia.org/wiki/Interprocedural_optimization#WPO_and_LTO) enabled so that the `complex` module gets inlined properly - see [nim.cfg](./nim.cfg) for an example of how to do this.
