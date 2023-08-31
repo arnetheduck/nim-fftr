@@ -1,4 +1,4 @@
-# fftn
+# fftr
 
 The fastest Fourier transform in the Rhein computes the complex [discrete Fourier transform](https://en.wikipedia.org/wiki/Discrete_Fourier_transform) (DFT) of a signal and back again with `O(N log N)` performance as usual.
 
