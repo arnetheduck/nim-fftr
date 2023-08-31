@@ -17,7 +17,7 @@ requires "fftr"
 Compute frequencies in a signal:
 
 ```nim
-import fftr, std/math
+import fftr, std/[math, sequtils]
 
 let
   signal = (0..1023).mapIt(complex64(sin(TAU * 0.1 * float64(it))))
