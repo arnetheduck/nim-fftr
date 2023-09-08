@@ -3,14 +3,11 @@
 ## Usage:
 ##
 ## ```nim
-## import fftr, std/math
+## import fftr, std/math, std/sequtils
 ##
 ## let
-##   signal = block:
-##     var tmp: newSeq[Complex64](1024)
-##     for i in 0..<tmp.len:
-##       tmp[i].re = sin(TAU * 0.1 * float64(i))
-##     tmp
+##   signal = (0..1023).mapIt(
+##     complex64(sin(TAU * 0.1 * float64(it))))
 ##
 ##   freqs = fft(tmp, false) # False for forward, true for inverse FFT
 ## ```
@@ -90,7 +87,7 @@ template butterflies: bool =
     false
 
 type
-  Radix2 = object
+  Radix2* = object
     twiddles: seq[Complex64]
     scratch: seq[Complex64]
     inverse: bool
@@ -131,7 +128,7 @@ func radix2(
     output[i] = p + q
     output[i + half] = p - q
 
-func radix2(
+func process*(
     ctx: var Radix2, input: openArray[Complex64],
     output: var openArray[Complex64]) =
   radix2(ctx, 0, input, output)
@@ -143,14 +140,14 @@ func init(T: type Radix2, len: int, inverse: bool): T =
     inverse: inverse)
 
 type
-  Bluestein = object
+  Bluestein* = object
     len: int
     bk: seq[Complex64]
     multiplier: seq[Complex64]
     inner: Radix2
     scratch, scratch2: seq[Complex64]
 
-func init(T: type Bluestein, len: int, inverse: bool): T =
+func init*(T: type Bluestein, len: int, inverse: bool): T =
   let
     twiddles = computeTwiddles(len * 2, not inverse)
   var
@@ -177,7 +174,7 @@ func init(T: type Bluestein, len: int, inverse: bool): T =
 
   var inner = Radix2.init(scratch.len, inverse)
   var multiplier = newSeq[Complex64](scratch.len)
-  radix2(inner, scratch, multiplier)
+  process(inner, scratch, multiplier)
 
   T(
     len: len,
@@ -188,7 +185,7 @@ func init(T: type Bluestein, len: int, inverse: bool): T =
     scratch2: newSeq[Complex64](scratch.len)
   )
 
-func bluestein(
+func process*(
     ctx: var Bluestein, input: openArray[Complex64],
     output: var openArray[Complex64]) =
   # Less efficient FFT for any length
@@ -200,16 +197,44 @@ func bluestein(
   for i in input.len..<ctx.scratch.len:
     ctx.scratch[i].reset()
 
-  radix2(ctx.inner, ctx.scratch, ctx.scratch2)
+  process(ctx.inner, ctx.scratch, ctx.scratch2)
 
   for i in 0..<ctx.scratch2.len:
     # The conjugate inverts the inner fft below
     ctx.scratch2[i] = conjugate(ctx.scratch2[i] * ctx.multiplier[i])
 
-  radix2(ctx.inner, ctx.scratch2, ctx.scratch)
+  process(ctx.inner, ctx.scratch2, ctx.scratch)
 
   for i in 0..<input.len:
     output[i] = ctx.scratch[i] * ctx.bk[i]
+
+type
+  RadixMixed* = object
+    len: int
+    twiddles: seq[Complex64]
+    scratch: seq[Complex64]
+
+    inner1: Radix2
+    inner2: Bluestein
+
+func init*(T: type RadixMixed, len: int, inverse: bool): T =
+  let
+    height = 1 shl len.countTrailingZeroBits()
+    width = len div height
+    term = twiddleTerm(len, inverse)
+    twiddles = block:
+      var tmp = newSeq[Complex64](len)
+      for x in 0..<width:
+        for y in 0..<height:
+          tmp[x * height + y] = twiddle(x*y, term)
+      tmp
+  T(
+    len: len,
+    twiddles: twiddles,
+    scratch: newSeq[Complex64](len),
+    inner1: Radix2.init(height, inverse),
+    inner2: Bluestein.init(width, inverse)
+  )
 
 func transpose[T](
     input: openArray[T], output: var openArray[T], width, height: int) =
@@ -218,6 +243,39 @@ func transpose[T](
   for x in 0..<width:
     for y in 0..<height:
       output[y + x * height] = input[x + y * width]
+
+func process*(
+    ctx: var RadixMixed, input: openArray[Complex64],
+    output: var openArray[Complex64]) =
+  # Mixed-radix FFT
+  assert input.len == output.len
+
+  let
+    height = 1 shl input.len.countTrailingZeroBits()
+    width = input.len div height
+
+  transpose(input, output, width, height)
+
+  block:
+    for i in 0..<width:
+      process(
+        ctx.inner1,
+        output.toOpenArray(i*height, (i+1)*height - 1),
+        ctx.scratch.toOpenArray(i*height, (i+1)*height - 1))
+
+  for i in 0..<ctx.scratch.len:
+    ctx.scratch[i] = ctx.scratch[i] * ctx.twiddles[i]
+
+  transpose(ctx.scratch, output, height, width)
+
+  block:
+    for i in 0..<height:
+      process(
+        ctx.inner2,
+        output.toOpenArray(i*width, (i+1)*width - 1),
+        ctx.scratch.toOpenArray(i*width, (i+1)*width - 1))
+
+  transpose(ctx.scratch, output, width, height)
 
 func dft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
   # Slow DFT - useful for testing
@@ -229,54 +287,15 @@ func dft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
       result[k] += input[n] * twiddles[k * n mod twiddles.len]
 
 func fft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
-  # Mostly efficient FFT for most lengths
+  # Convenience entry point that chooses FFT based on input length
   result.setLen(input.len)
 
   if isPowerOfTwo(input.len):
     var ctx = Radix2.init(input.len, inverse)
-    radix2(ctx, 0, input, result)
+    process(ctx, input, result)
   elif input.len.countTrailingZeroBits == 0:
     var ctx = Bluestein.init(input.len, inverse)
-    bluestein(ctx, input, result)
+    process(ctx, input, result)
   else:
-    let
-      height = 1 shl input.len.countTrailingZeroBits()
-      width = input.len div height
-      term = twiddleTerm(input.len, inverse)
-      twiddles = block:
-        var tmp = newSeq[Complex64](input.len)
-        for x in 0..<width:
-          for y in 0..<height:
-            tmp[x * height + y] = twiddle(x*y, term)
-        tmp
-
-    result.setLen(input.len)
-
-    transpose(input, result, width, height)
-
-    var scratch = newSeq[Complex64](input.len)
-
-    block:
-      var ctx = Radix2.init(height, inverse)
-
-      for i in 0..<width:
-        radix2(
-          ctx, 0,
-          result.toOpenArray(i*height, (i+1)*height - 1),
-          scratch.toOpenArray(i*height, (i+1)*height - 1))
-
-    for i in 0..<scratch.len:
-      scratch[i] = scratch[i] * twiddles[i]
-
-    transpose(scratch, result, height, width)
-
-    block:
-      var ctx = Bluestein.init(width, inverse)
-
-      for i in 0..<height:
-        bluestein(
-          ctx,
-          result.toOpenArray(i*width, (i+1)*width - 1),
-          scratch.toOpenArray(i*width, (i+1)*width - 1))
-
-    transpose(scratch, result, width, height)
+    var ctx = RadixMixed.init(input.len, inverse)
+    process(ctx, input, result)

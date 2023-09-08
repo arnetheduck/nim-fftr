@@ -11,7 +11,7 @@ It's also likely the only one developed from a viewpoint overlooking the Rhein r
 In your library:
 
 ```nim
-requires "fftr"
+requires "https://github.com/arnetheduck/nim-fftr"
 ```
 
 Compute frequencies in a signal:
