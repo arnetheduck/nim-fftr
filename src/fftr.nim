@@ -17,6 +17,23 @@ import
 
 export complex
 
+const SQRT_2 = 1.41421356237309504880
+
+func rotate45(value: Complex64, inverse: bool): Complex64 =
+  if not inverse:
+    complex64((value.re + value.im) / SQRT_2, (value.im - value.re) / SQRT_2)
+  else:
+    complex64((value.re - value.im) / SQRT_2, (value.im + value.re) / SQRT_2)
+
+func rotate90(value: Complex64, inverse: bool): Complex64 =
+  if not inverse:
+    complex64(value.im, -value.re)
+  else:
+    complex64(-value.im, value.re)
+
+func rotate180(value: Complex64): Complex64 =
+  complex64(-value.re, -value.im)
+
 func twiddleTerm(fftLen: int, inverse: bool): float64 =
   # the constant term of the twiddle computation
   if inverse:
@@ -28,114 +45,144 @@ func twiddle(i: int, term: float64): Complex64 =
   let theta = float64(i) * term
   complex64(cos(theta), sin(theta))
 
-func rotate90(value: Complex64, inverse: bool): Complex64 =
-  if not inverse:
-    complex64(value.im, -value.re)
-  else:
-    complex64(-value.im, value.re)
-
-func computeTwiddles(len: int, inverse: bool): seq[Complex64] =
+func computeTwiddles1(len: int, inverse: bool): seq[Complex64] =
   let term = twiddleTerm(len, inverse)
 
   result = newSeq[Complex64](len)
   for i in 0..<len:
     result[i] = twiddle(i, term)
 
-func butterfly1(input: openArray[Complex64], output: var openArray[Complex64]) =
-  assert input.len == 1
-  assert input.len == output.len
-  output[0] = input[0]
+func computeTwiddles2(len: int, inverse: bool): seq[Complex64] =
+  let term = twiddleTerm(len, inverse)
+
+  result = newSeq[Complex64](len)
+  for i in 0..<(len div 2):
+    let tmp = twiddle(i, term)
+    result[i] = tmp
+    result[i + len div 2] = rotate180(tmp)
+
+func computeTwiddles4(len: int, inverse: bool): seq[Complex64] =
+  let term = twiddleTerm(len, inverse)
+
+  result = newSeq[Complex64](len)
+  for i in 0..<(len div 4):
+    let tmp = twiddle(i, term)
+    result[i] = tmp
+    result[i + len div 4] = rotate90(tmp, inverse)
+    result[i + len div 2] = rotate180(tmp)
+    result[i + 3 * len div 4] = rotate90(tmp, not inverse)
+
+func computeTwiddles8(len: int, inverse: bool): seq[Complex64] =
+  let term = twiddleTerm(len, inverse)
+
+  result = newSeq[Complex64](len)
+  for i in 0..<(len div 8):
+    let tmp = twiddle(i, term)
+    let tmp45 = rotate45(tmp, inverse)
+    result[i] = tmp
+    result[i + len div 4] = rotate90(tmp, inverse)
+    result[i + len div 2] = rotate180(tmp)
+    result[i + 3 * len div 4] = rotate90(tmp, not inverse)
+    let i45 = i + len div 8
+    result[i45] = tmp45
+    result[i45 + len div 4] = rotate90(tmp45, inverse)
+    result[i45 + len div 2] = rotate180(tmp45)
+    result[i45 + 3 * len div 4] = rotate90(tmp45, not inverse)
+
+func computeTwiddles(len: int, inverse: bool): seq[Complex64] =
+  if len mod 8 == 0: computeTwiddles8(len, inverse)
+  elif len mod 4 == 0: computeTwiddles4(len, inverse)
+  elif len mod 2 == 0: computeTwiddles2(len, inverse)
+  else: computeTwiddles1(len, inverse)
+
+func butterfly1(i0: Complex64, o0: var Complex64) =
+  o0 = i0
 
 func butterfly2(i0, i1: Complex64, o0, o1: var Complex64) =
   o0 = i0 + i1
   o1 = i0 - i1
 
-func butterfly2(input: openArray[Complex64], output: var openArray[Complex64]) =
-  assert input.len == 2
-  assert input.len == output.len
-  butterfly2(input[0], input[1], output[0], output[1])
-
 func butterfly4(
-    input: openArray[Complex64], output: var openArray[Complex64],
+    i0, i1, i2, i3: Complex64, o0, o1, o2, o3: var Complex64,
     inverse: bool) =
-  assert input.len == 4
-  assert input.len == output.len
-
   var a0, a1, a2, a3: Complex64
-  butterfly2(input[0], input[2], a0, a2)
-  butterfly2(input[1], input[3], a1, a3)
+  butterfly2(i0, i2, a0, a2)
+  butterfly2(i1, i3, a1, a3)
 
   a3 = rotate90(a3, inverse)
 
-  butterfly2(a0, a1, output[0], output[2])
-  butterfly2(a2, a3, output[1], output[3])
-
-template butterflies: bool =
-  case input.len
-  of 0:
-    true
-  of 1:
-    butterfly1(input, output)
-    true
-  of 2:
-    butterfly2(input, output)
-    true
-  of 4:
-    butterfly4(input, output, ctx.inverse)
-    true
-  else:
-    false
+  butterfly2(a0, a1, o0, o2)
+  butterfly2(a2, a3, o1, o3)
 
 type
-  Radix2* = object
+  Stockham2* = object
     twiddles: seq[Complex64]
     scratch: seq[Complex64]
     inverse: bool
 
-func radix2(
-    ctx: var Radix2, strideShift: int,
-    input: openArray[Complex64], output: var openArray[Complex64]) =
-  # Simple divide-and-conquer FFT for powers of 2
-  assert isPowerOfTwo(input.len)
-  assert input.len == output.len
+func stockham2(
+    ctx: var Stockham2, stride, n: int,
+    input: ptr UncheckedArray[Complex64],
+    output: ptr UncheckedArray[Complex64],
+    tmp: ptr UncheckedArray[Complex64]) =
+  # Stockham FFT for powers of two
+  assert isPowerOfTwo(n)
 
-  if butterflies():
-    return
+  case n
+  of 0: discard
+  of 1: butterfly1(input[0], output[0])
+  of 2:
+    for q in 0..<stride:
+      butterfly2(input[q], input[q + stride], output[q], output[q + stride])
+  of 4:
+    for q in 0..<stride:
+      butterfly4(
+          input[q], input[q + stride], input[q + 2 * stride], input[q + 3 * stride],
+          output[q], output[q + stride], output[q + 2 * stride], output[q + 3 * stride],
+          ctx.inverse)
+  else:
+    let m = n div 2
 
-  let
-    len = input.len
-    half = len div 2
+    block: # twiddle is a noop on the first round
+      for q in 0..<stride:
+        const p = 0
+        let
+          a = input[q + stride * p]
+          b = input[q + stride * (p + m)]
+        output[q + stride * (2 * p)] = a + b
+        output[q + stride * ((2 * p) + 1)] = (a - b) # * wp
 
-  # Avoid overwriting scratch space during recursion
-  # TODO iterative / inplace algo instead?
-  for i in 0..<half:
-    ctx.scratch[i + half] = input[i * 2]
-  radix2(
-    ctx, strideShift + 1, ctx.scratch.toOpenArray(half, len - 1),
-    output.toOpenArray(0, half-1))
+    for p in 1..<m:
+      let wp = ctx.twiddles[p * stride]
 
-  for i in 0..<half:
-    ctx.scratch[i + half] = input[i * 2 + 1]
+      for q in 0..<stride:
+        let
+          a = input[q + stride * p]
+          b = input[q + stride * (p + m)]
+        output[q + stride * (2 * p)] = a + b
+        output[q + stride * ((2 * p) + 1)] = (a - b) * wp
 
-  radix2(
-    ctx, strideShift + 1, ctx.scratch.toOpenArray(half, len - 1),
-    output.toOpenArray(half, output.high))
-
-  for i in 0..<half:
-    let
-      p = output[i]
-      q = ctx.twiddles[i shl strideShift] * output[i + half]
-    output[i] = p + q
-    output[i + half] = p - q
+    stockham2(ctx, 2 * stride, m, output, tmp, output);
 
 func process*(
-    ctx: var Radix2, input: openArray[Complex64],
+    ctx: var Stockham2, input: openArray[Complex64],
     output: var openArray[Complex64]) =
-  radix2(ctx, 0, input, output)
+  let
+    direct = input.len.countTrailingZeroBits mod 2 == 0 or input.len <= 4
+    o = cast[ptr UncheckedArray[Complex64]](addr output[0])
+    tmp = cast[ptr UncheckedArray[Complex64]](addr ctx.scratch[0])
+  # stockham2 will flip between o and tmp for every iteration so we want the final
+  # result to end up in the output
+  stockham2(
+    ctx, 1, input.len,
+    cast[ptr UncheckedArray[Complex64]](unsafeAddr input[0]),
+    if direct: o else: tmp,
+    if direct: tmp else: o
+    )
 
-func init(T: type Radix2, len: int, inverse: bool): T =
+func init(T: type Stockham2, len: int, inverse: bool): T =
   T(
-    twiddles: computeTwiddles(len, inverse),
+    twiddles: if len >= 4: computeTwiddles(len, inverse) else: @[],
     scratch: newSeq[Complex64](len),
     inverse: inverse)
 
@@ -144,7 +191,7 @@ type
     len: int
     bk: seq[Complex64]
     multiplier: seq[Complex64]
-    inner: Radix2
+    inner: Stockham2
     scratch, scratch2: seq[Complex64]
 
 func init*(T: type Bluestein, len: int, inverse: bool): T =
@@ -172,7 +219,7 @@ func init*(T: type Bluestein, len: int, inverse: bool): T =
     scratch[i] = t
     scratch[scratch.len - i] = t
 
-  var inner = Radix2.init(scratch.len, inverse)
+  var inner = Stockham2.init(scratch.len, inverse)
   var multiplier = newSeq[Complex64](scratch.len)
   process(inner, scratch, multiplier)
 
@@ -190,7 +237,6 @@ func process*(
     output: var openArray[Complex64]) =
   # Less efficient FFT for any length
   assert input.len == output.len
-
   for i in 0..<input.len:
     ctx.scratch[i] = input[i] * conjugate(ctx.bk[i])
 
@@ -214,7 +260,7 @@ type
     twiddles: seq[Complex64]
     scratch: seq[Complex64]
 
-    inner1: Radix2
+    inner1: Stockham2
     inner2: Bluestein
 
 func init*(T: type RadixMixed, len: int, inverse: bool): T =
@@ -232,7 +278,7 @@ func init*(T: type RadixMixed, len: int, inverse: bool): T =
     len: len,
     twiddles: twiddles,
     scratch: newSeq[Complex64](len),
-    inner1: Radix2.init(height, inverse),
+    inner1: Stockham2.init(height, inverse),
     inner2: Bluestein.init(width, inverse)
   )
 
@@ -247,7 +293,7 @@ func transpose[T](
 func process*(
     ctx: var RadixMixed, input: openArray[Complex64],
     output: var openArray[Complex64]) =
-  # Mixed-radix FFT
+  # Mixed-radix 6-step FFT
   assert input.len == output.len
 
   let
@@ -291,7 +337,7 @@ func fft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
   result.setLen(input.len)
 
   if isPowerOfTwo(input.len):
-    var ctx = Radix2.init(input.len, inverse)
+    var ctx = Stockham2.init(input.len, inverse)
     process(ctx, input, result)
   elif input.len.countTrailingZeroBits == 0:
     var ctx = Bluestein.init(input.len, inverse)

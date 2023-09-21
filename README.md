@@ -2,7 +2,7 @@
 
 The fastest Fourier transform in the Rhein computes the complex [discrete Fourier transform](https://en.wikipedia.org/wiki/Discrete_Fourier_transform) (DFT) of a signal and back again with `O(N log N)` performance as usual.
 
-Faster ones exist, but hey, it has decent speed, is less than 300loc and is written in pure Nim for minimal hassle.
+Faster ones exist, but hey, it has decent speed, is less than 400loc and is written in pure Nim for minimal hassle.
 
 It's also likely the only one developed from a viewpoint overlooking the Rhein river.
 
@@ -40,38 +40,38 @@ nim c -d:release -r benches/bench_fftr
 
    min time    avg time  std dv   runs name
    0.001 ms    0.001 ms  ±0.000  x1000 pow2 - 64
-   0.003 ms    0.003 ms  ±0.001  x1000 pow2 - 128
-   0.006 ms    0.007 ms  ±0.002  x1000 pow2 - 256
-   0.012 ms    0.014 ms  ±0.002  x1000 pow2 - 512
-   0.028 ms    0.030 ms  ±0.001  x1000 pow2 - 1024
-   0.063 ms    0.072 ms  ±0.008  x1000 pow2 - 2048
-   0.134 ms    0.150 ms  ±0.013  x1000 pow2 - 4096
-   0.566 ms    0.630 ms  ±0.024  x1000 pow2 - 16384
-   2.542 ms    2.857 ms  ±0.094  x1000 pow2 - 65536
+   0.001 ms    0.001 ms  ±0.001  x1000 pow2 - 128
+   0.003 ms    0.004 ms  ±0.002  x1000 pow2 - 256
+   0.006 ms    0.007 ms  ±0.001  x1000 pow2 - 512
+   0.013 ms    0.014 ms  ±0.001  x1000 pow2 - 1024
+   0.029 ms    0.032 ms  ±0.001  x1000 pow2 - 2048
+   0.067 ms    0.070 ms  ±0.002  x1000 pow2 - 4096
+   0.309 ms    0.321 ms  ±0.004  x1000 pow2 - 16384
+   1.423 ms    1.461 ms  ±0.017  x1000 pow2 - 65536
    0.001 ms    0.001 ms  ±0.000  x1000 prime - 5
-   0.004 ms    0.004 ms  ±0.000  x1000 prime - 17
-   0.037 ms    0.040 ms  ±0.003  x1000 prime - 149
-   0.037 ms    0.040 ms  ±0.003  x1000 prime - 151
-   0.040 ms    0.044 ms  ±0.003  x1000 prime - 251
-   0.183 ms    0.193 ms  ±0.009  x1000 prime - 1009
-   0.328 ms    0.393 ms  ±0.024  x1000 prime - 2017
-   0.746 ms    0.804 ms  ±0.020  x1000 prime - 2879
-   7.834 ms    8.619 ms  ±0.831   x557 prime - 32767
-  16.807 ms   21.508 ms  ±4.978   x233 prime - 65521
-  37.290 ms   51.094 ms ±10.062    x98 prime - 65537
- 492.727 ms  583.762 ms ±66.755     x9 prime - 746483
- 464.380 ms  559.417 ms ±85.344     x9 prime - 746497
-  16.495 ms   18.823 ms  ±2.110   x258 prime-power - 44521
-  81.320 ms   87.315 ms  ±6.168    x58 prime-power - 160801
-   1.677 ms    1.875 ms  ±0.078  x1000 mult-of-power-of-2 - 24576
-   2.384 ms    2.728 ms  ±0.322  x1000 mult-of-power-of-2 - 20736
-   5.757 ms    7.301 ms  ±1.982   x666 small-comp-large-prime - 30270
-   0.003 ms    0.003 ms  ±0.001  x1000 small-comp - 18
-   0.034 ms    0.054 ms  ±0.030  x1000 small-comp - 360
-   9.435 ms   11.395 ms  ±1.962   x429 small-comp - 44100
-   5.926 ms    6.753 ms  ±0.733   x721 small-comp - 48000
-   6.383 ms    7.133 ms  ±0.741   x690 small-comp - 46656
-  15.438 ms   17.284 ms  ±1.845   x288 small-comp - 100000
+   0.002 ms    0.002 ms  ±0.000  x1000 prime - 17
+   0.023 ms    0.025 ms  ±0.001  x1000 prime - 149
+   0.023 ms    0.025 ms  ±0.001  x1000 prime - 151
+   0.025 ms    0.027 ms  ±0.001  x1000 prime - 251
+   0.111 ms    0.116 ms  ±0.003  x1000 prime - 1009
+   0.238 ms    0.246 ms  ±0.006  x1000 prime - 2017
+   0.488 ms    0.505 ms  ±0.009  x1000 prime - 2879
+   4.934 ms    5.051 ms  ±0.057   x989 prime - 32767
+  10.866 ms   11.053 ms  ±0.102   x452 prime - 65521
+  21.629 ms   21.957 ms  ±0.165   x228 prime - 65537
+ 244.610 ms  249.728 ms  ±6.073    x20 prime - 746483
+ 244.258 ms  246.235 ms  ±1.584    x21 prime - 746497
+  10.468 ms   10.688 ms  ±0.091   x468 prime-power - 44521
+  47.279 ms   47.748 ms  ±0.308   x105 prime-power - 160801
+   1.309 ms    1.361 ms  ±0.021  x1000 mult-of-power-of-2 - 24576
+   1.915 ms    1.959 ms  ±0.023  x1000 mult-of-power-of-2 - 20736
+   4.171 ms    4.251 ms  ±0.037  x1000 small-comp-large-prime - 30270
+   0.002 ms    0.002 ms  ±0.000  x1000 small-comp - 18
+   0.028 ms    0.029 ms  ±0.001  x1000 small-comp - 360
+   6.936 ms    7.046 ms  ±0.046   x710 small-comp - 44100
+   4.653 ms    4.759 ms  ±0.041  x1000 small-comp - 48000
+   4.919 ms    5.049 ms  ±0.045   x991 small-comp - 46656
+  11.567 ms   11.741 ms  ±0.067   x426 small-comp - 100000
 ```
 
 [fftw](./benches/bench_fftw.nim):
@@ -115,8 +115,11 @@ nim c -d:release -r benches/bench_fftw
    0.529 ms    0.560 ms  ±0.033  x1000 small-comp - 100000
 ```
 
-## Guts
+## Guts and references
 
+Stuff that seemed useful while writing the code:
+
+* [Stockham](http://wwwa.pikara.ne.jp/okojisan/otfft-en/stockham1.html)
 * [Radix2](https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm#The_radix-2_DIT_case) FFT for power-of-2-length transforms
 * [Bluestein](https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm) for prime length transforms
 * [Mixed radix](https://community.arm.com/arm-community-blogs/b/graphics-gaming-and-vr-blog/posts/speeding-up-fast-fourier-transform-mixed-radix-on-mobile-arm-mali-gpu-by-means-of-opencl---part-1) of Radix-2 and Bluestein for the rest
