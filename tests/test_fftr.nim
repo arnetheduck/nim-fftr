@@ -6,14 +6,6 @@ proc makeBuffer(size: int): seq[Complex64] =
     tmp[j].re = sin(0.1 * TAU * float64(j))
   tmp
 
-proc almostEqual[T](a, b: openArray[T]): bool =
-  if a.len != b.len:
-    return false
-  for i in 0..<a.len:
-    if not almostEqual(a[i].re, b[i].re):
-      return false
-  true
-
 suite "FFT":
   for i in 1..512:
     test "fft vs dft " & $i:
@@ -22,12 +14,15 @@ suite "FFT":
         aa = dft(signal, false)
         bb = fft(signal, false)
 
-        af = foldl(aa, a + abs(b), 0.0)
-        bf = foldl(bb, a + abs(b), 0.0)
+        af = foldl(aa, a + b, complex64(0.0))
+        bf = foldl(bb, a + b, complex64(0.0))
       checkpoint($(aa))
       checkpoint($(bb))
+      checkpoint($(af))
+      checkpoint($(bf))
       check:
-        almostEqual(af, bf, 7)
+        bf.re - af.re < 1e-10
+        bf.im - af.im < 1e-10
 
     test "fft vs dft inverse " & $i:
       let
@@ -35,12 +30,15 @@ suite "FFT":
         aa = dft(signal, true)
         bb = fft(signal, true)
 
-        af = foldl(aa, a + abs(b), 0.0)
-        bf = foldl(bb, a + abs(b), 0.0)
+        af = foldl(aa, a + b, complex64(0.0))
+        bf = foldl(bb, a + b, complex64(0.0))
       checkpoint($(aa))
       checkpoint($(bb))
+      checkpoint($(af))
+      checkpoint($(bf))
       check:
-        almostEqual(af, bf, 7)
+        bf.re - af.re < 1e-10
+        bf.im - af.im < 1e-10
 
 # These are broken on nim 1.6:
 # static:

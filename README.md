@@ -25,6 +25,8 @@ let
   # abs gets us back into real space
   # false for forward FFT, true for inverse (TODO flip it? separate names?)
   frequencies = fft(signal, false).mapIt(abs(it))
+  # Scaling must be applied manually
+  signalAgain = fft(fft(signal, false), true).mapIt(abs(it)/signal.len.float64)
 ```
 
 For performance, it's important to compile the application with [LTO](https://en.wikipedia.org/wiki/Interprocedural_optimization#WPO_and_LTO) enabled so that the `complex` module gets inlined properly - see [nim.cfg](./nim.cfg) for an example of how to do this.

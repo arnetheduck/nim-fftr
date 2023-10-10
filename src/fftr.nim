@@ -252,7 +252,7 @@ func process*(
   process(ctx.inner, ctx.scratch2, ctx.scratch)
 
   for i in 0..<input.len:
-    output[i] = ctx.scratch[i] * ctx.bk[i]
+    output[i] = conjugate(ctx.scratch[i]) * conjugate(ctx.bk[i])
 
 type
   RadixMixed* = object
