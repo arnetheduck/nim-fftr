@@ -13,7 +13,7 @@
 ## ```
 
 import
-  std/[bitops, complex, math]
+  std/[bitops, complex, math, sequtils]
 
 export complex
 
@@ -323,8 +323,8 @@ func process*(
 
   transpose(ctx.scratch, output, width, height)
 
-func dft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = false): seq[Complex64] =
-  # Slow DFT - useful for testing
+func dftImpl(input: openArray[Complex64], inverse: bool = false, normalize: bool = false): seq[Complex64] =
+  ## Slow DFT implementation (useful for testing)
   result.setLen(input.len)
 
   let twiddles = computeTwiddles(input.len, inverse)
@@ -337,26 +337,91 @@ func dft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = 
     for i in 0..<result.len:
       result[i] = result[i] / complexInputLen
 
-func fft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = false): seq[Complex64] =
+func dft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = false, n = 0): seq[Complex64] =
+  ## Calculates the DFT or the IDFT of an input signal using a slow, straight-forward implementation
+  ##
+  ## This function is only meant for testing, since it is a straight-forward but slow implementaiton of the DFT
+  ##
+  ## Inputs:
+  ## - input: The input signal.
+  ## - inverse: if true, calculates the inverse FFT, otherwise calculates the FFT (which is the default).
+  ## - normalize: if true, normalizes the results by dividing by the length of the signal when inverse is true.
+  ## - n: Length of the the output.
+  ##      If `n` is not given, the length of the input is automatically used.
+  ##      If `n` is smaller than the length of the input, the input is cropped.
+  ##      If `n` is larger, the input is padded with zeros.
+  let size = if n <= 0: input.len else: n
+
+  if size < input.len:
+    # Extend the input with zeros as much as needed
+    let input = input.toSeq & newSeq[Complex64](size - input.len)
+  elif size < input.len:
+    # Crop the input as much as needed
+    let input = input[0..<size]
+
+  dftImpl(input, inverse=inverse, normalize=normalize)
+
+func fftImpl(input: openArray[Complex64], inverse: bool = false, normalize: bool = false): seq[Complex64] =
   ## Calculates the FFT or the IFFT of an input signal using the best method given the input length
   ##
   ## Inputs:
   ## - input: The input signal
   ## - inverse: if true, calculates the inverse FFT, otherwise calculates the FFT
   ## - normalize: if true, normalizes the results by dividing by the length of the signal when inverse is true
-  result.setLen(input.len)
+  let size = input.len
+  result.setLen(size)
 
-  if isPowerOfTwo(input.len):
-    var ctx = Stockham2.init(input.len, inverse)
+  if isPowerOfTwo(size):
+    var ctx = Stockham2.init(size, inverse)
     process(ctx, input, result)
-  elif input.len.countTrailingZeroBits == 0:
-    var ctx = Bluestein.init(input.len, inverse)
+  elif size.countTrailingZeroBits == 0:
+    var ctx = Bluestein.init(size, inverse)
     process(ctx, input, result)
   else:
-    var ctx = RadixMixed.init(input.len, inverse)
+    var ctx = RadixMixed.init(size, inverse)
     process(ctx, input, result)
 
   if inverse and normalize:
-    let complexInputLen = complex64(float64(input.len))
+    let complexInputLen = complex64(float64(size))
     for i in 0..<result.len:
       result[i] = result[i] / complexInputLen
+
+func fft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = false, n = 0): seq[Complex64] =
+  ## Calculates the FFT or the IFFT of an input signal
+  ##
+  ## This function automatically selects the best calculation method given the desired FFT size
+  ##
+  ## Inputs:
+  ## - input: The input signal.
+  ## - inverse: if true, calculates the inverse FFT, otherwise calculates the FFT (which is the default).
+  ## - normalize: if true, normalizes the results by dividing by the length of the signal when inverse is true.
+  ## - n: Length of the the output.
+  ##      If `n` is not given, the length of the input is automatically used.
+  ##      If `n` is smaller than the length of the input, the input is cropped.
+  ##      If `n` is larger, the input is padded with zeros.
+  let size = if n <= 0: input.len else: n
+
+  let input = if size > input.len:
+    # Extend the input with zeros as much as needed
+    input.toSeq & newSeq[Complex64](size - input.len)
+  elif size < input.len:
+    # Crop the input as much as needed
+    input[0..<size]
+  else:
+    input.toSeq
+
+  fftImpl(input, inverse=inverse, normalize=normalize)
+
+func ifft*(input: openArray[Complex64], n = 0, normalize: bool = false): seq[Complex64] {.inline.} =
+  ## Calculates the IFFT of an input signal using the best method given the input length
+  ##
+  ## This is a convenience function that simply calls `fft` with the inverse argument set to true.
+  ## 
+  ## Inputs:
+  ## - input: The input signal.
+  ## - normalize: if true, normalizes the results by dividing by the length of the signal when inverse is true.
+  ## - n: Length of the the output.
+  ##      If `n` is not given, the length of the input is automatically used.
+  ##      If `n` is smaller than the length of the input, the input is cropped.
+  ##      If `n` is larger, the input is padded with zeros.
+  fft(input, inverse=true, normalize=normalize, n=n)
