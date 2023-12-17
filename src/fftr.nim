@@ -13,7 +13,7 @@
 ## ```
 
 import
-  std/[bitops, complex, math, sequtils]
+  std/[bitops, complex, math]
 
 export complex
 
@@ -352,14 +352,16 @@ func dft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = 
   ##      If `n` is larger, the input is padded with zeros.
   let size = if n <= 0: input.len else: n
 
-  if size < input.len:
+  if size > input.len:
     # Extend the input with zeros as much as needed
-    let input = input.toSeq & newSeq[Complex64](size - input.len)
+    var extendedInput = newSeq[Complex64](size)
+    extendedInput[0..input.high] = input
+    dftImpl(extendedInput, inverse=inverse, normalize=normalize)
   elif size < input.len:
     # Crop the input as much as needed
-    let input = input[0..<size]
-
-  dftImpl(input, inverse=inverse, normalize=normalize)
+    dftImpl(input[0..<size], inverse=inverse, normalize=normalize)
+  else:
+    dftImpl(input, inverse=inverse, normalize=normalize)
 
 func fftImpl(input: openArray[Complex64], inverse: bool = false, normalize: bool = false): seq[Complex64] =
   ## Calculates the FFT or the IFFT of an input signal using the best method given the input length
@@ -401,16 +403,16 @@ func fft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = 
   ##      If `n` is larger, the input is padded with zeros.
   let size = if n <= 0: input.len else: n
 
-  let input = if size > input.len:
+  if size > input.len:
     # Extend the input with zeros as much as needed
-    input.toSeq & newSeq[Complex64](size - input.len)
+    var extendedInput = newSeq[Complex64](size)
+    extendedInput[0..input.high] = input
+    fftImpl(extendedInput, inverse=inverse, normalize=normalize)
   elif size < input.len:
     # Crop the input as much as needed
-    input[0..<size]
+    fftImpl(input[0..<size], inverse=inverse, normalize=normalize)
   else:
-    input.toSeq
-
-  fftImpl(input, inverse=inverse, normalize=normalize)
+    fftImpl(input, inverse=inverse, normalize=normalize)
 
 func ifft*(input: openArray[Complex64], n = 0, normalize: bool = false): seq[Complex64] {.inline.} =
   ## Calculates the IFFT of an input signal using the best method given the input length
