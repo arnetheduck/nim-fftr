@@ -23,10 +23,18 @@ let
   signal = (0..1023).mapIt(complex64(sin(TAU * 0.1 * float64(it))))
 
   # abs gets us back into real space
-  # false for forward FFT, true for inverse (TODO flip it? separate names?)
-  frequencies = fft(signal, false).mapIt(abs(it))
-  # Scaling must be applied manually
-  signalAgain = fft(fft(signal, false), true).mapIt(abs(it)/signal.len.float64)
+  frequencies = fft(signal).mapIt(abs(it))
+  # backwards scaling is applied automatically to the ifft operation
+  signal_again = ifft(fft(signal))
+
+  # ortho and forward scaling are also supported
+  ortho_norm_frequencies = fft(signal, norm=ortho).mapIt(abs(it))
+  forward_norm_frequencies = fft(signal, norm=forward).mapIt(abs(it))
+  # scaling can also be disabled entirely
+  signal_again_no_norm = ifft(fft(signal, norm=disabled), norm=disabled)
+
+  # it is also possible to explicitly set the fft size to a different value
+  twice_the_frequencies = fft(signal, n=2048).mapIt(abs(it))
 ```
 
 For performance, it's important to compile the application with [LTO](https://en.wikipedia.org/wiki/Interprocedural_optimization#WPO_and_LTO) enabled so that the `complex` module gets inlined properly - see [nim.cfg](./nim.cfg) for an example of how to do this.
