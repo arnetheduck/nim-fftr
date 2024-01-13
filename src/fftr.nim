@@ -323,7 +323,7 @@ func process*(
 
   transpose(ctx.scratch, output, width, height)
 
-func dft*(input: openArray[Complex64], inverse: bool, normalize: bool = false): seq[Complex64] =
+func dft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = false): seq[Complex64] =
   # Slow DFT - useful for testing
   result.setLen(input.len)
 
@@ -337,7 +337,7 @@ func dft*(input: openArray[Complex64], inverse: bool, normalize: bool = false): 
     for i in 0..<result.len:
       result[i] = result[i] / complexInputLen
 
-func fft*(input: openArray[Complex64], inverse: bool, normalize: bool = false): seq[Complex64] =
+func fft*(input: openArray[Complex64], inverse: bool = false, normalize: bool = false): seq[Complex64] =
   ## Calculates the FFT or the IFFT of an input signal using the best method given the input length
   ##
   ## Inputs:
