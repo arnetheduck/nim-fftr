@@ -28,7 +28,7 @@ suite "FFT":
       let
         signal = makeBuffer(i)
         aa = dft(signal, true)
-        bb = fft(signal, true)
+        bb = ifft(signal)
 
         af = foldl(aa, a + b, complex64(0.0))
         bf = foldl(bb, a + b, complex64(0.0))
@@ -40,24 +40,29 @@ suite "FFT":
         abs(bf.re - af.re) < 1e-10
         abs(bf.im - af.im) < 1e-10
 
-  test "normalized ifft":
-    let
-      signal = makeBuffer(512)
-      aa = dft(dft(signal, false), true, normalize=true)
-      bb = fft(fft(signal, false), true, normalize=true)
+  for norm in FftNormalization:
+    test "fft/ifft normalization - " & $norm:
+      let
+        signal = makeBuffer(512)
+        aa = dft(dft(signal, norm=norm), true, norm=norm)
+        bb = ifft(fft(signal, norm=norm), norm=norm)
 
-      sf = foldl(signal, a + b, complex64(0.0))
-      af = foldl(aa, a + b, complex64(0.0))
-      bf = foldl(bb, a + b, complex64(0.0))
-    checkpoint($(aa))
-    checkpoint($(bb))
-    checkpoint($(af))
-    checkpoint($(bf))
-    check:
-      abs(bf.re - af.re) < 1e-10
-      abs(bf.im - af.im) < 1e-10
-      abs(sf.re - bf.re) < 1e-10
-      abs(sf.im - bf.im) < 1e-10
+        sf = foldl(signal, a + b, complex64(0.0))
+        af = foldl(aa, a + b, complex64(0.0))
+        bf = foldl(bb, a + b, complex64(0.0))
+      checkpoint($(aa))
+      checkpoint($(bb))
+      checkpoint($(af))
+      checkpoint($(bf))
+      check:
+        abs(bf.re - af.re) < 1e-10
+        abs(bf.im - af.im) < 1e-10
+      # When normalization is disabled,
+      # the IFFT of the FFT does not match the input
+      if norm != disabled:
+        check:
+          abs(sf.re - bf.re) < 1e-10
+          abs(sf.im - bf.im) < 1e-10
 
   # Test FFT with a specific sizes
   for n in [8, 12, 16]:
