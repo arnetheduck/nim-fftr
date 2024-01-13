@@ -40,6 +40,25 @@ suite "FFT":
         bf.re - af.re < 1e-10
         bf.im - af.im < 1e-10
 
+  test "normalized ifft":
+    let
+      signal = makeBuffer(512)
+      aa = dft(dft(signal, false), true, normalize=true)
+      bb = fft(fft(signal, false), true, normalize=true)
+
+      sf = foldl(signal, a + b, complex64(0.0))
+      af = foldl(aa, a + b, complex64(0.0))
+      bf = foldl(bb, a + b, complex64(0.0))
+    checkpoint($(aa))
+    checkpoint($(bb))
+    checkpoint($(af))
+    checkpoint($(bf))
+    check:
+      abs(bf.re - af.re) < 1e-10
+      abs(bf.im - af.im) < 1e-10
+      abs(sf.re - bf.re) < 1e-10
+      abs(sf.im - bf.im) < 1e-10
+
 # These are broken on nim 1.6:
 # static:
 #   for i in [3, 4, 8, 9, 16, 17]:

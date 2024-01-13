@@ -323,7 +323,7 @@ func process*(
 
   transpose(ctx.scratch, output, width, height)
 
-func dft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
+func dft*(input: openArray[Complex64], inverse: bool, normalize: bool = false): seq[Complex64] =
   # Slow DFT - useful for testing
   result.setLen(input.len)
 
@@ -332,12 +332,18 @@ func dft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
     for n in 0..<result.len:
       result[k] += input[n] * twiddles[k * n mod twiddles.len]
 
-func fft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
+  if inverse and normalize:
+    let complexInputLen = complex64(float64(input.len))
+    for i in 0..<result.len:
+      result[i] = result[i] / complexInputLen
+
+func fft*(input: openArray[Complex64], inverse: bool, normalize: bool = false): seq[Complex64] =
   ## Calculates the FFT or the IFFT of an input signal using the best method given the input length
   ##
   ## Inputs:
   ## - input: The input signal
   ## - inverse: if true, calculates the inverse FFT, otherwise calculates the FFT
+  ## - normalize: if true, normalizes the results by dividing by the length of the signal when inverse is true
   result.setLen(input.len)
 
   if isPowerOfTwo(input.len):
@@ -349,3 +355,8 @@ func fft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
   else:
     var ctx = RadixMixed.init(input.len, inverse)
     process(ctx, input, result)
+
+  if inverse and normalize:
+    let complexInputLen = complex64(float64(input.len))
+    for i in 0..<result.len:
+      result[i] = result[i] / complexInputLen
