@@ -323,25 +323,150 @@ func process*(
 
   transpose(ctx.scratch, output, width, height)
 
-func dft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
-  # Slow DFT - useful for testing
-  result.setLen(input.len)
+type
+  FftNormalization* = enum
+    ## Normalization modes for the FFT and the IFFT
+    backward,  ## Only the IFFT (i.e. the backward transform) is scaled by `1/n`.
+    ortho,     ## Both the FFT and the IFFT are scaled by `1/sqrt(n)`.
+    forward,   ## Only the FFT (i.e. the forward transform) is scaled by `1/n`.
+    disabled   ## No normalization is applied to any transform.
 
-  let twiddles = computeTwiddles(input.len, inverse)
+func dftImpl(input: openArray[Complex64], inverse: bool = false, norm: FftNormalization): seq[Complex64] =
+  ## Slow DFT implementation (useful for testing)
+  let size = input.len
+  result.setLen(size)
+
+  let twiddles = computeTwiddles(size, inverse)
   for k in 0..<result.len:
     for n in 0..<result.len:
       result[k] += input[n] * twiddles[k * n mod twiddles.len]
 
-func fft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
-  # Convenience entry point that chooses FFT based on input length
-  result.setLen(input.len)
+  if norm == disabled or (inverse and norm == forward) or (not inverse and norm == backward):
+    return
 
-  if isPowerOfTwo(input.len):
-    var ctx = Stockham2.init(input.len, inverse)
+  let scalingFactor = if norm == ortho:
+      sqrt(float64(size))
+    else:
+      float64(size)
+  for i in 0..<result.len:
+    result[i] = result[i] / scalingFactor
+
+func dft*(input: openArray[Complex64], inverse: bool = false, n = 0, norm: FftNormalization = backward): seq[Complex64] =
+  ## Calculates the DFT or the IDFT of an input signal using a slow, straight-forward implementation
+  ##
+  ## This function is only meant for testing, since it is a straight-forward but slow implementaiton of the DFT
+  ##
+  ## Inputs:
+  ## - input: The input signal.
+  ## - inverse: If true, calculates the inverse FFT, otherwise calculates the FFT (which is the default).
+  ## - n: Length of the the output.
+  ##      If `n` is not given, the length of the input is automatically used.
+  ##      If `n` is smaller than the length of the input, the input is cropped.
+  ##      If `n` is larger, the input is padded with zeros.
+  ## - norm: Normalization mode. Default is `backward`.
+  ##         For norm=`backward` no normalization is applied to the FFT
+  ##         (i.e. to the forward transform) and scaling by `1/n` is applied to the IFFT
+  ##         (i.e. to the backward transform).
+  ##         For norm=`forward` a `1/n` factor is only applied to the FFT (i.e. to the forward tranform).
+  ##         For norm=`ortho`, both transforms are scaled by `1/sqrt(n)`.
+  ##         For norm=`disabled`, no normalization is applied to any transform.
+  let size = if n <= 0: input.len else: n
+
+  if size > input.len:
+    # Extend the input with zeros as much as needed
+    var extendedInput = newSeq[Complex64](size)
+    extendedInput[0..input.high] = input
+    dftImpl(extendedInput, inverse=inverse, norm=norm)
+  elif size < input.len:
+    # Crop the input as much as needed
+    dftImpl(input[0..<size], inverse=inverse, norm=norm)
+  else:
+    dftImpl(input, inverse=inverse, norm=norm)
+
+func fftImpl(input: openArray[Complex64], inverse: bool = false, norm: FftNormalization): seq[Complex64] =
+  ## Calculates the FFT or the IFFT of an input signal using the best method given the input length
+  ##
+  ## Inputs:
+  ## - input: The input signal.
+  ## - inverse: if true, calculates the inverse FFT, otherwise calculates the FFT.
+  ## - norm: Normalization mode. Default is `backward`.
+  ##         For norm=`backward` no normalization is applied to the FFT
+  ##         (i.e. to the forward transform) and scaling by `1/n` is applied to the IFFT
+  ##         (i.e. to the backward transform).
+  ##         For norm=`forward` a `1/n` factor is only applied to the FFT (i.e. to the forward tranform).
+  ##         For norm=`ortho`, both transforms are scaled by `1/sqrt(n)`.
+  ##         For norm=`disabled`, no normalization is applied to any transform.
+  let size = input.len
+  result.setLen(size)
+
+  if isPowerOfTwo(size):
+    var ctx = Stockham2.init(size, inverse)
     process(ctx, input, result)
-  elif input.len.countTrailingZeroBits == 0:
-    var ctx = Bluestein.init(input.len, inverse)
+  elif size.countTrailingZeroBits == 0:
+    var ctx = Bluestein.init(size, inverse)
     process(ctx, input, result)
   else:
-    var ctx = RadixMixed.init(input.len, inverse)
+    var ctx = RadixMixed.init(size, inverse)
     process(ctx, input, result)
+
+  if norm == disabled or (inverse and norm == forward) or (not inverse and norm == backward):
+    return
+
+  let scalingFactor = if norm == ortho:
+      sqrt(float64(size))
+    else:
+      float64(size)
+  for i in 0..<result.len:
+    result[i] = result[i] / scalingFactor
+
+func fft*(input: openArray[Complex64], inverse: bool = false, n = 0, norm: FftNormalization = backward): seq[Complex64] =
+  ## Calculates the FFT or the IFFT of an input signal
+  ##
+  ## This function automatically selects the best calculation method given the desired FFT size
+  ##
+  ## Inputs:
+  ## - input: The input signal.
+  ## - inverse: If true, calculates the inverse FFT, otherwise calculates the FFT (which is the default).
+  ## - n: Length of the the output.
+  ##      If `n` is not given, the length of the input is automatically used.
+  ##      If `n` is smaller than the length of the input, the input is cropped.
+  ##      If `n` is larger, the input is padded with zeros.
+  ## - norm: Normalization mode. Default is `backward`.
+  ##         For norm=`backward` no normalization is applied to the FFT
+  ##         (i.e. to the forward transform) and scaling by `1/n` is applied to the IFFT
+  ##         (i.e. to the backward transform).
+  ##         For norm=`forward` a `1/n` factor is only applied to the FFT (i.e. to the forward tranform).
+  ##         For norm=`ortho`, both transforms are scaled by `1/sqrt(n)`.
+  ##         For norm=`disabled`, no normalization is applied to any transform.
+  let size = if n <= 0: input.len else: n
+
+  if size > input.len:
+    # Extend the input with zeros as much as needed
+    var extendedInput = newSeq[Complex64](size)
+    extendedInput[0..input.high] = input
+    fftImpl(extendedInput, inverse=inverse, norm=norm)
+  elif size < input.len:
+    # Crop the input as much as needed
+    fftImpl(input[0..<size], inverse=inverse, norm=norm)
+  else:
+    fftImpl(input, inverse=inverse, norm=norm)
+
+func ifft*(input: openArray[Complex64], n = 0, norm: FftNormalization = backward): seq[Complex64] {.inline.} =
+  ## Calculates the IFFT of an input signal using the best method given the input length
+  ##
+  ## This is a convenience function that simply calls `fft` with the inverse argument set to true.
+  ## 
+  ## Inputs:
+  ## - input: The input signal.
+  ## - n: Length of the the output.
+  ##      If `n` is not given, the length of the input is automatically used.
+  ##      If `n` is smaller than the length of the input, the input is cropped.
+  ##      If `n` is larger, the input is padded with zeros.
+  ## - norm: Normalization mode. Default is `backward`.
+  ##         For norm=`backward` no normalization is applied to the FFT
+  ##         (i.e. to the forward transform) and scaling by `1/n` is applied to the IFFT
+  ##         (i.e. to the backward transform).
+  ##         For norm=`forward` a `1/n` factor is only applied to the FFT (i.e. to the forward tranform).
+  ##         For norm=`ortho`, both transforms are scaled by `1/sqrt(n)`.
+  ##         For norm=`disabled`, no normalization is applied to any transform.
+  fft(input, inverse=true, n=n, norm=norm)
