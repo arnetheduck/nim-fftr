@@ -333,7 +333,11 @@ func dft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
       result[k] += input[n] * twiddles[k * n mod twiddles.len]
 
 func fft*(input: openArray[Complex64], inverse: bool): seq[Complex64] =
-  # Convenience entry point that chooses FFT based on input length
+  ## Calculates the FFT or the IFFT of an input signal using the best method given the input length
+  ##
+  ## Inputs:
+  ## - input: The input signal
+  ## - inverse: if true, calculates the inverse FFT, otherwise calculates the FFT
   result.setLen(input.len)
 
   if isPowerOfTwo(input.len):
