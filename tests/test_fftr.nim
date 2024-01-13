@@ -59,31 +59,41 @@ suite "FFT":
       abs(sf.re - bf.re) < 1e-10
       abs(sf.im - bf.im) < 1e-10
 
-  test "fft with specific size":
+  # Test FFT with a specific sizes
+  for n in [8, 12, 16]:
     let
-      signal = makeBuffer(8)
-      aa = dft(signal, false, n=16)
-      bb = fft(signal, false, n=16)
-      cc = ifft(bb, normalize=true)
+      signalLen = 12
+    let desc = if n > signalLen: "larger than input"
+      elif n < signalLen: "smaller than input"
+      else: "same as input"
+    test "fft with specific size " & desc:
+      let
+        signal = makeBuffer(signalLen)
+        aa = dft(signal, false, n=n)
+        bb = fft(signal, false, n=n)
+        cc = ifft(bb)
 
-      sf = foldl(signal, a + b, complex64(0.0))
-      af = foldl(aa, a + b, complex64(0.0))
-      bf = foldl(bb, a + b, complex64(0.0))
-      cf = foldl(cc, a + b, complex64(0.0))
-    checkpoint($(aa))
-    checkpoint($(bb))
-    checkpoint($(signal))
-    checkpoint($(cc))
-    checkpoint($(sf))
-    checkpoint($(af))
-    checkpoint($(bf))
-    checkpoint($(cf))
-    check:
-      bb.len == 16
-      abs(bf.re - af.re) < 1e-10
-      abs(bf.im - af.im) < 1e-10
-      abs(sf.re - cf.re) < 1e-10
-      abs(sf.im - cf.im) < 1e-10
+        sf = foldl(signal, a + b, complex64(0.0))
+        af = foldl(aa, a + b, complex64(0.0))
+        bf = foldl(bb, a + b, complex64(0.0))
+        cf = foldl(cc, a + b, complex64(0.0))
+      checkpoint($(aa))
+      checkpoint($(bb))
+      checkpoint($(signal))
+      checkpoint($(cc))
+      checkpoint($(sf))
+      checkpoint($(af))
+      checkpoint($(bf))
+      checkpoint($(cf))
+      check:
+        bb.len == n
+        abs(bf.re - af.re) < 1e-10
+        abs(bf.im - af.im) < 1e-10
+      # When n is smaller than the input, the IFFT of the FFT does not match the input
+      if n >= signalLen:
+        check:
+          abs(sf.re - cf.re) < 1e-10
+          abs(sf.im - cf.im) < 1e-10
 
   test "ifft convenience function":
     let
