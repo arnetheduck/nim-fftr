@@ -21,8 +21,8 @@ suite "FFT":
       checkpoint($(af))
       checkpoint($(bf))
       check:
-        bf.re - af.re < 1e-10
-        bf.im - af.im < 1e-10
+        abs(bf.re - af.re) < 1e-10
+        abs(bf.im - af.im) < 1e-10
 
     test "fft vs dft inverse " & $i:
       let
@@ -37,8 +37,8 @@ suite "FFT":
       checkpoint($(af))
       checkpoint($(bf))
       check:
-        bf.re - af.re < 1e-10
-        bf.im - af.im < 1e-10
+        abs(bf.re - af.re) < 1e-10
+        abs(bf.im - af.im) < 1e-10
 
   test "normalized ifft":
     let
