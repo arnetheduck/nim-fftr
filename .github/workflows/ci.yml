@@ -1,5 +1,14 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+      - test-*
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      branch:
+        default: '"== 2.2"'
 
 concurrency: # Cancel stale PR builds (but not push builds)
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -7,32 +16,39 @@ concurrency: # Cancel stale PR builds (but not push builds)
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        nim:
-          - '1.6.0'
-          - '2.0.0'
-          - '1.6.x'
-          - '2.0.x'
-          - 'devel'
-        os:
-          -  ubuntu-latest
-    name: Nim ${{ matrix.nim }} / ${{matrix.os}}
+        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '" == 1.6.0"," ~= 1.6.0"," == 2.0.0"," ~= 2.0.0"," == 2.2.0"," ~= 2.2.0","#devel"')) }}
+
+    name: 'nim ${{matrix.branch}}'
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup nim
-        uses: jiro4989/setup-nim-action@v1
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - uses: nim-lang/setup-nimble-action@v1
         with:
-          nim-version: ${{ matrix.nim }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download nimble
-        run: |
-          curl -Ls https://github.com/nim-lang/nimble/releases/download/latest/nimble-linux_x64.tar.gz | tar xz
-          mv nimble $(which nimble)
-      - name: Setup dependencies
-        run: nimble install -l -d -y
+
       - name: Run tests
-        run: nimble test -y
+        run: |
+          nimble setup
+          env NIMLANG="c" nimble test --requires="nim${{matrix.branch}}"
+          env NIMLANG="cpp" nimble test --requires="nim${{matrix.branch}}"
+
       - name: Run benchmarks
         run: nimble bench -y
+
+
+  lint:
+    name: "Check formatting"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Check `nph` formatting
+        uses: arnetheduck/nph-action@v1
+        with:
+          version: 0.7.0
+          options: "."

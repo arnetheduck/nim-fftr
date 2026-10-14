@@ -1,11 +1,11 @@
 # Package
 
-version       = "0.1.0"
-author        = "Jacek Sieka"
-description   = "The fastest Fourier transform in the Rhein (so far)"
-license       = "MIT"
-srcDir        = "src"
-installExt    = @["nim"]
+version = "0.1.0"
+author = "Jacek Sieka"
+description = "The fastest Fourier transform in the Rhein (so far)"
+license = "MIT"
+srcDir = "src"
+installExt = @["nim"]
 
 requires "nim >= 1.6.0"
 requires "unittest2"
@@ -18,11 +18,11 @@ let flags = getEnv("NIMFLAGS", "") # Extra flags for the compiler
 let verbose = getEnv("V", "") notin ["", "0"]
 let cfg =
   " --styleCheck:usages --styleCheck:error" &
-  (if verbose: "" else: " --verbosity:0 --hints:off") &
-  " --outdir:build -f"
+  (if verbose: "" else: " --verbosity:0 --hints:off") & " --outdir:build -f"
 
 proc build(args, path: string) =
-  exec nimc & " " & getPathsClause() & " " & lang & " " & cfg & " " & flags & " " & args & " " & path
+  exec nimc & " " & getPathsClause() & " " & lang & " " & cfg & " " & flags & " " & args &
+    " " & path
 
 proc run(args, path: string) =
   build args & " -r", path
