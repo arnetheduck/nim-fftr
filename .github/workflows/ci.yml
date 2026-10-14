@@ -27,8 +27,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - uses: nim-lang/setup-nimble-action@v1
+      - uses: nim-lang/setup-nimble-action@v2
         with:
+          nimble-version: 33a6bc8e50a33222fce075143800fe5a715e8bfe  # v0.26.0
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
