@@ -2,12 +2,12 @@ import std/[math, sequtils], unittest2, fftr
 
 proc makeBuffer(size: int): seq[Complex64] =
   var tmp = newSeq[Complex64](size)
-  for j in 0..tmp.high:
+  for j in 0 .. tmp.high:
     tmp[j].re = sin(0.1 * TAU * float64(j))
   tmp
 
 suite "FFT":
-  for i in 1..512:
+  for i in 1 .. 512:
     test "fft vs dft " & $i:
       let
         signal = makeBuffer(i)

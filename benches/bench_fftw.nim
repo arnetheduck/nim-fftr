@@ -2,8 +2,7 @@ import complex, math, benchy, fftw3
 
 proc benchFFT(name: string, size: int) =
   GC_fullCollect()
-  var
-    input = newSeq[Complex64](size)
+  var input = newSeq[Complex64](size)
 
   timeit name & " - " & $size:
     var output = newSeq[Complex64](size)
@@ -16,10 +15,12 @@ proc benchFFT(name: string, size: int) =
 for size in [64, 128, 256, 512, 1024, 2048, 4096, 16384, 65536]:
   benchFFT("pow2", size)
 
-for size in [5, 17, 149, 151, 251, 1009, 2017, 2879, 32767, 65521, 65537, 746483, 746497]:
+for size in [
+  5, 17, 149, 151, 251, 1009, 2017, 2879, 32767, 65521, 65537, 746483, 746497
+]:
   benchFFT "prime", size
 
-for size in [211^2, 401^2]:
+for size in [211 ^ 2, 401 ^ 2]:
   benchFFT "prime-power", size
 
 for size in [24576, 20736]:
